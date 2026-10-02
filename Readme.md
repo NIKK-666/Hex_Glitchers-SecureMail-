@@ -88,76 +88,10 @@ Supporting components:
 
 ## 5. System Architecture
 
-┌──────────────────────────────────────────────────────────────────────┐
-│  FRONTEND: React Investigator Dashboard                              │
-│  ranked risk findings · session detail · link-analysis graph         │
-└───────────────────────────────▲──────────────────────────────────────┘
-                                │ REST (JSON)
-┌───────────────────────────────┴──────────────────────────────────────┐
-│  BACKEND / API: Python FastAPI                                       │
-│  ingestion API · correlation engine · job orchestration              │
-└───────┬───────────────────────┬───────────────────────┬──────────────┘
-        │                       │                       │
-        ▼                       ▼                       ▼
-┌───────────────┐      ┌─────────────────┐     ┌──────────────────────┐
-│ DATA INGESTION│─────▶│ SESSION REBUILD │────▶│ CERT & HANDSHAKE     │
-│ PCAP parsing  │      │ STARTTLS + TCP  │     │ X.509 + cipher       │
-│ (SMTP/IMAP/   │      │ stream rebuild  │     │ extract, JA3/JA3S    │
-│  POP3)        │      │                 │     │                      │
-└───────┬───────┘      └────────┬────────┘     └──────────┬───────────┘
-        │                       │                         │
-        └──────────┬────────────┴────────────┬────────────┘
-                   ▼                         ▼
-        ┌─────────────────────┐   ┌──────────────────────────┐
-        │ POSTGRESQL          │   │ NEO4J GRAPH DB           │
-        │ tabular features    │   │ servers ─ certs ─        │
-        │ confidence_tier     │   │ sessions (linked)        │
-        │ audit trail         │   │                          │
-        └──────────┬──────────┘   └────────────┬─────────────┘
-                   └──────────────┬────────────┘
-                                  ▼
-                   ┌──────────────────────────────┐
-                   │ ENTITY CLUSTERING            │
-                   │ group servers by shared certs│
-                   └───────┬──────────────┬───────┘
-                           │              │
-            ┌──────────────▼───┐    ┌─────▼──────────────────┐
-            │ ML: GraphSAGE    │    │ STRUCTURAL PATTERN     │
-            │ inductive node   │    │ MATCHING               │
-            │ embeddings       │    │ downgrade · MITM       │
-            └────────┬─────────┘    └─────┬──────────────────┘
-                     │                    │
-                     │   ┌────────────────┴──┐
-                     │   │ ML: ISOLATION     │
-                     │   │ FOREST            │
-                     │   │ anomaly score     │
-                     │   │ (no labels)       │
-                     │   └────────┬──────────┘
-                     ▼            ▼
-                ┌───────────────────────────┐
-                │ ML: XGBOOST               │
-                │ cryptographic risk score  │
-                └─────────────┬─────────────┘
-                              ▼
-                ┌───────────────────────────┐
-                │ RISK PROPAGATION          │
-                │ spread risk across graph  │
-                └─────────────┬─────────────┘
-                              ▼
-                ┌───────────────────────────┐
-                │ EXPLAINABILITY            │
-                │ SHAP + SubgraphX          │
-                │ → local LLM plain-language│
-                │   rationale               │
-                └─────────────┬─────────────┘
-                              ▼
-                  back to FRONTEND (ranked, explained alerts)
-
-═══════════════════════════════════════════════════════════════════════
- SECURITY & DEPLOYMENT (wraps everything above)
- fully offline · Linux-hosted · Docker · no external API calls
- signed model/rule artifacts verified before load
-═══════════════════════════════════════════════════════════════════════
+PCAP → STARTTLS/TCP Rebuild → X.509 + Handshake Extract → PostgreSQL + Neo4j
+     → Entity Clustering → GraphSAGE + Isolation Forest + Pattern Matching
+     → XGBoost Risk Score → Risk Propagation → SHAP/SubgraphX + Local LLM
+     → React Dashboard (ranked, explained alerts)
 
 <img width="952" height="968" alt="26159 pptx (3)" src="https://github.com/user-attachments/assets/adf37484-1547-46e3-9df2-4fcbef6f9477" />
 
